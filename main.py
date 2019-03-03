@@ -25,13 +25,13 @@ parser.add_argument('--build_dict', type=bool, default=False)
 parser.add_argument('--initilize', type=bool, default=False)
 parser.add_argument('--embedding_dim', type=int, default=100)
 parser.add_argument('--train_embeddings', type=bool, default=True)
-parser.add_argument('--nb_negative_samples', type=int, default=5)
-parser.add_argument('--lr', type=float, default=0.01)
+parser.add_argument('--nb_negative_samples', type=int, default=15)
+parser.add_argument('--lr', type=float, default=0.1)
 parser.add_argument('--context', type=int, default=5)
 parser.add_argument('--lemmatize', type=bool, default=True)
 parser.add_argument('--stemming', type=bool, default=False)
 parser.add_argument('--tokenized_data_file', type=str, default='tokenized_data_lemmatized.pkl')
-parser.add_argument('--nb_epochs', type=int, default=50)
+parser.add_argument('--nb_epochs', type=int, default=30)
 parser.add_argument('--lr_annealing', type=bool, default=True)
 
 args = parser.parse_args()
@@ -42,8 +42,8 @@ lemmer = WordNetLemmatizer()
 
 def sigmoid(x):
     # print(x)
-    if x < -500:
-        x = -500
+    # if x < -500:
+    #     x = -500
     return 1 / (1 + math.exp(-x))
 
 def get_train_test_splits():
@@ -138,7 +138,7 @@ def initilize_word_embeddings(dim):
     initial_embeddings = {}
 
     for word, count in train_counts.items():
-        initial_embeddings[word] = np.random.randn(dim)
+        initial_embeddings[word] = np.random.rand(dim)
     return initial_embeddings
     # print("Creating dump of initila word embeddings ++++++++")
     # pickle.dump(initial_embeddings, open('initial_embeddings.pkl', 'wb'))
@@ -221,7 +221,7 @@ def sgd_step(embedding, grad, lr):
     pass
 
 def train_word2vec(tokenized_data_file, nb_neg_samples, lr, context, nb_epochs, dim, anneal):
-    build_dict(tokenized_data_file)
+    # build_dict(tokenized_data_file)
     train_counts = pickle.load(open('dict_count_train_lemmatized.pkl','rb'))
     normalized_counts = normalize_counts(train_counts)
     threshold = 0.00001
@@ -247,8 +247,8 @@ def train_word2vec(tokenized_data_file, nb_neg_samples, lr, context, nb_epochs, 
                 loss = get_loss(positive_samples, negative_samples, word_embedding, context_embedding, normalized_counts)
                 word_grad, context_grad, neg_context_grad, word, context = get_grad(positive_samples, negative_samples, word_embedding, context_embedding)
                 if anneal:
-                    if epoch+1 %5 == 0:
-                        lr = 0.1*lr
+                    if epoch+1 %4 == 0:
+                        lr = 0.5*lr
                 for w_grad in word_grad:
                     word_embedding[word] = word_embedding[word] + lr*w_grad
                 for key, c_grad in context_grad.items():
