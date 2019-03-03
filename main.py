@@ -25,12 +25,13 @@ parser.add_argument('--initilize', type=bool, default=False)
 parser.add_argument('--embedding_dim', type=int, default=100)
 parser.add_argument('--train_embeddings', type=bool, default=True)
 parser.add_argument('--nb_negative_samples', type=int, default=5)
-parser.add_argument('--lr', type=float, default=0.01)
+parser.add_argument('--lr', type=float, default=0.1)
 parser.add_argument('--context', type=int, default=5)
 parser.add_argument('--lemmatize', type=bool, default=True)
 parser.add_argument('--stemming', type=bool, default=False)
 parser.add_argument('--tokenized_data_file', type=str, default='tokenized_data_lemmatized.pkl')
 parser.add_argument('--nb_epochs', type=int, default=50)
+parser.add_argument('--lr_annealing', type=bool, default=True)
 
 args = parser.parse_args()
 nltk.download('wordnet')
@@ -214,7 +215,7 @@ def get_grad(pos_samples, neg_samles, word_embedding, context_embedding):
 def sgd_step(embedding, grad, lr):
     pass
 
-def train_word2vec(tokenized_data_file, nb_neg_samples, lr, context, nb_epochs, dim):
+def train_word2vec(tokenized_data_file, nb_neg_samples, lr, context, nb_epochs, dim, anneal):
     # build_dict(tokenized_data_file)
     train_counts = pickle.load(open('dict_count_train_lemmatized.pkl','rb'))
     normalized_counts = normalize_counts(train_counts)
@@ -230,16 +231,29 @@ def train_word2vec(tokenized_data_file, nb_neg_samples, lr, context, nb_epochs, 
 
 
     for epoch in range(nb_epochs):
-        for i in tqdm(range(data_size)):
+        running_loss = []
+        print('Epoch {}/{}'.format(epoch, nb_epochs - 1))
+        print('-' * 10)
+        for i in tqdm(range(data_size), unit='Words'):
             positive_samples = next(positive_samples_generator)
             negative_samples = next(negative_samples_generator)
             if positive_samples != None:
                 loss = get_loss(positive_samples, negative_samples, word_embedding, context_embedding, normalized_counts)
                 word_grad, context_grad, neg_context_grad, word, context = get_grad(positive_samples, negative_samples, word_embedding, context_embedding)
+                if anneal:
+                    if epoch+1 %5 == 0:
+                        lr = 0.1*lr
+                for w_grad in word_grad:
+                    word_embedding[word] = word_embedding[word] + lr*w_grad
+                for key, c_grad in context_grad.items():
+                    context_embedding[key] = context_grad[key] + lr*c_grad
+                for key, n_grad in neg_context_grad.items():
+                    context_embedding[key] = context_grad[key] + lr*c_grad
+                running_loss.append(loss)
+                tqdm.set_postfix(loss=sum(loss)/len(loss))
 
-
-    loss = get_loss(pos_samples, neg_samles)
-    loss_grad = get_grad(positive_samples, negative_samples)
+                # loss = get_loss(pos_samples, neg_samles)
+                # word_grad, context_grad, neg_context_grad, word, context = get_grad(positive_samples, negative_samples, word_embedding, context_embedding)
 
 
 
@@ -254,4 +268,5 @@ if args.initilize:
     initilize_word_embeddings(args.embedding_dim)
 
 if args.train_embeddings:
-    train_word2vec(args.tokenized_data_file, args.nb_negative_samples, args.lr, args.context, args.nb_epochs, args.embedding_dim)
+    train_word2vec(args.tokenized_data_file, args.nb_negative_samples, args.lr,
+    args.context, args.nb_epochs, args.embedding_dim, args.lr_annealing)
