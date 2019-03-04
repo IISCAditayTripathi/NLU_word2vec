@@ -42,8 +42,9 @@ lemmer = WordNetLemmatizer()
 
 def sigmoid(x):
     # print(x)
-    # if x < -600:
-    #     x = -600
+    if x < -10:
+        x = -10
+    # print(x)
     return 1 / (1 + math.exp(-x))
 
 def get_train_test_splits():
@@ -136,9 +137,11 @@ def initilize_word_embeddings(dim):
     print("Initilizing word2vec embeddings ++++++++")
     train_counts = pickle.load(open('dict_count_train_lemmatized.pkl','rb'))
     initial_embeddings = {}
+    # sigma = 0.1
+    sigma = math.sqrt(2/dim)
 
     for word, count in train_counts.items():
-        initial_embeddings[word] = np.random.rand(dim)
+        initial_embeddings[word] = sigma*np.random.randn(dim)
     return initial_embeddings
     # print("Creating dump of initila word embeddings ++++++++")
     # pickle.dump(initial_embeddings, open('initial_embeddings.pkl', 'wb'))
@@ -203,20 +206,26 @@ def get_loss(pos_samples, neg_samples, word_embedding, context_embedding, train_
     neg_loss_list = [((train_counts[c]**(3/4))/total_count)*math.log(sigmoid(-1*np.dot(word_embedding[word], context_embedding[c]))) for c in neg_samples]
 
     loss = sum(pos_loss_list) + sum(neg_loss_list)
+    # print(pos_loss_list)
+    # print(neg_loss_list)
+    # print("Aditay")
     return loss, sum(pos_loss_list), sum(neg_loss_list)
 
 def get_grad(pos_samples, neg_samples, word_embedding, context_embedding):
     word = pos_samples[0]
     context = pos_samples[1]
 
-    word_grad = [(1-sigmoid(np.dot(word_embedding[word], context_embedding[c])))*word_embedding[word] for c in context]
+    word_grad = [(1-sigmoid(np.dot(word_embedding[word], context_embedding[c])))*context_embedding[c] for c in context]
+    # print(np.linalg.norm(word_embedding[word]))
+    # print(np.linalg.norm(word_grad[0]))
     context_grad = defaultdict(list)
-    [context_grad[c].append((1-sigmoid(np.dot(word_embedding[word], context_embedding[c])))*context_embedding[c]) for c in context]
+    [context_grad[c].append((1-sigmoid(np.dot(word_embedding[word], context_embedding[c])))*word_embedding[word]) for c in context]
     neg_context_grad = defaultdict(list)
-    [neg_context_grad[c].append(-1*(1-sigmoid(-1*np.dot(word_embedding[word], context_embedding[c])))*context_embedding[c]) for c in neg_samples]
+    [neg_context_grad[c].append(-1*(1-sigmoid(-1*np.dot(word_embedding[word], context_embedding[c])))*word_embedding[word]) for c in neg_samples]
     neg_word_grad = defaultdict(list)
-    [neg_word_grad[c].append(-1*(1-sigmoid(-1*np.dot(word_embedding[word], context_embedding[c])))*word_embedding[word]) for c in neg_samples]
-
+    [neg_word_grad[c].append(-1*(1-sigmoid(-1*np.dot(word_embedding[word], context_embedding[c])))*context_embedding[c]) for c in neg_samples]
+    # print(word_grad)
+    # aditay
 
     return word_grad, context_grad, neg_context_grad, neg_word_grad, word, context
 
@@ -239,20 +248,22 @@ def train_word2vec(tokenized_data_file, nb_neg_samples, lr, context, nb_epochs, 
 
 
     for epoch in range(nb_epochs):
-        running_loss = []
-        running_loss_p = []
-        running_loss_n = []
+        running_loss = 0
+        running_loss_p = 0
+        running_loss_n = 0
+        count = 0
         print('Epoch {}/{}'.format(epoch, nb_epochs - 1))
         print('-' * 10)
         loader = tqdm(range(data_size), unit='words')
         for i in enumerate(loader):
             positive_samples = next(positive_samples_generator)
             negative_samples = next(negative_samples_generator)
+
             if positive_samples != None:
                 loss, p_loss, n_loss = get_loss(positive_samples, negative_samples, word_embedding, context_embedding, train_counts, total_count)
                 word_grad, context_grad, neg_context_grad, neg_word_grad, word, context = get_grad(positive_samples, negative_samples, word_embedding, context_embedding)
                 if anneal:
-                    if epoch+1 %4 == 0:
+                    if (epoch+1) %4 == 0:
                         lr = 0.5*lr
                 for w_grad in word_grad:
                     word_embedding[word] = word_embedding[word] + lr*w_grad
@@ -264,12 +275,19 @@ def train_word2vec(tokenized_data_file, nb_neg_samples, lr, context, nb_epochs, 
                     context_embedding[key] = context_embedding[key] + lr*c_grad[0]
                 for key, n_grad in neg_context_grad.items():
                     context_embedding[key] = context_embedding[key] + lr*(n_grad[0]*((train_counts[key]**(3/4))/total_count))
-                running_loss.append(loss)
-                running_loss_n.append(n_loss)
-                running_loss_p.append(p_loss)
+                # running_loss.append(loss)
+                # running_loss_n.append(n_loss)
+                # running_loss_p.append(p_loss)
+                if math.isnan(p_loss):
+                    print(neg_word_grad)
+                    exit()
+                running_loss_n += n_loss
+                running_loss_p += p_loss
+                running_loss += loss
+                count += 1
 
-                loader.set_postfix(loss=sum(running_loss)/len(running_loss), p_loss=sum(running_loss_p)/len(running_loss_p),
-                                    n_loss=sum(running_loss_n)/len(running_loss_n))
+                loader.set_postfix(loss=running_loss/count, p_loss=running_loss_p/count,
+                                    n_loss=running_loss_n/count, lr=lr)
     pickle.dump(word_embedding, open('word_embeddings_15_100dim_v2.pkl', 'wb'))
     pickle.dump(context_embedding, open('context_embedding_15_100dim_v2.pkl', 'wb'))
 
