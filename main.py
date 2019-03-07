@@ -17,6 +17,8 @@ import pickle
 from tqdm import tqdm
 import math
 from collections import defaultdict
+from scipy.stats.stats import pearsonr
+# import sklearn
 
 parser = argparse.ArgumentParser()
 
@@ -24,15 +26,17 @@ parser.add_argument('--tokenize', type=bool, default=False)
 parser.add_argument('--build_dict', type=bool, default=False)
 parser.add_argument('--initilize', type=bool, default=False)
 parser.add_argument('--embedding_dim', type=int, default=100)
-parser.add_argument('--train_embeddings', type=bool, default=True)
+parser.add_argument('--train_embeddings', type=bool, default=False)
 parser.add_argument('--nb_negative_samples', type=int, default=15)
 parser.add_argument('--lr', type=float, default=0.1)
 parser.add_argument('--context', type=int, default=5)
 parser.add_argument('--lemmatize', type=bool, default=True)
 parser.add_argument('--stemming', type=bool, default=False)
 parser.add_argument('--tokenized_data_file', type=str, default='tokenized_data_lemmatized.pkl')
-parser.add_argument('--nb_epochs', type=int, default=30)
-parser.add_argument('--lr_annealing', type=bool, default=True)
+parser.add_argument('--nb_epochs', type=int, default=28)
+parser.add_argument('--lr_annealing', type=bool, default=False)
+parser.add_argument('--simlex_file', type=str, default='/scratche/home/aditay/NLU_assignment1/simlex/SimLex-999/SimLex-999.txt')
+parser.add_argument('--pearson_cofficient', type=bool, default=True)
 
 args = parser.parse_args()
 nltk.download('wordnet')
@@ -286,13 +290,52 @@ def train_word2vec(tokenized_data_file, nb_neg_samples, lr, context, nb_epochs, 
                 running_loss += loss
                 count += 1
 
-                loader.set_postfix(loss=running_loss/count, p_loss=running_loss_p/count,
+                loader.set_postfix(w_norm=np.linalg.norm(word_embedding[word]), p_loss=running_loss_p/count,
                                     n_loss=running_loss_n/count, lr=lr)
-    pickle.dump(word_embedding, open('word_embeddings_15_100dim_v2.pkl', 'wb'))
-    pickle.dump(context_embedding, open('context_embedding_15_100dim_v2.pkl', 'wb'))
+    pickle.dump(word_embedding, open('checkpoints/word_embeddings_15_100dim_v2.pkl', 'wb'))
+    pickle.dump(context_embedding, open('checkpoints/context_embedding_15_100dim_v2.pkl', 'wb'))
 
                 # loss = get_loss(pos_samples, neg_samles)
                 # word_grad, context_grad, neg_context_grad, word, context = get_grad(positive_samples, negative_samples, word_embedding, context_embedding)
+def calculate_cosine_similarity(vector_1, vector_2):
+    similarity = np.dot(vector_1, vector_2)/(np.linalg.norm(vector_1)*np.linalg.norm(vector_2))
+    return similarity
+
+def calculate_pearson_cofficient(simlex_file, word_embedding='checkpoints/word_embeddings_15_100dim_v2.pkl',
+                                context_embedding='checkpoints/context_embedding_15_100dim_v2.pkl'):
+    sim_file = open(simlex_file, 'r')
+    w_embedding = pickle.load(open(word_embedding, 'rb'))
+    c_embedding = pickle.load(open(context_embedding, 'rb'))
+    simlex_scores = []
+    model_scores = []
+    i = 0
+    for line in sim_file:
+        i += 1
+        if i > 1:
+            l = line.split('\t')
+            # print(l)
+
+            try:
+                if args.lemmatize:
+                    w1_1 = w_embedding[lemmer.lemmatize(l[0])]
+                    w1_2 = c_embedding[lemmer.lemmatize(l[0])]
+
+                    w2_1 = w_embedding[lemmer.lemmatize(l[1])]
+                    w2_2 = c_embedding[lemmer.lemmatize(l[1])]
+                    w1 = np.hstack([w1_1, w1_2])
+                    w2 = np.hstack([w2_1, w2_2])
+
+                    w2v_score = calculate_cosine_similarity(w1, w2)
+                    simlex_scores.append(float(l[3]))
+                    # print(w2v_score)
+                    model_scores.append(w2v_score)
+                    # print(1)
+            except:
+                pass
+
+    pearson_cofficient = pearsonr(simlex_scores, model_scores)
+    print(pearson_cofficient)
+
 
 
 
@@ -309,3 +352,6 @@ if args.initilize:
 if args.train_embeddings:
     train_word2vec(args.tokenized_data_file, args.nb_negative_samples, args.lr,
     args.context, args.nb_epochs, args.embedding_dim, args.lr_annealing)
+
+if args.pearson_cofficient:
+    calculate_pearson_cofficient(args.simlex_file)
