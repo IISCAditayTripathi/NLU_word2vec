@@ -260,38 +260,42 @@ def train_word2vec(tokenized_data_file, nb_neg_samples, lr, context, nb_epochs, 
         print('-' * 10)
         loader = tqdm(range(data_size), unit='words')
         for i in enumerate(loader):
-            positive_samples = next(positive_samples_generator)
-            negative_samples = next(negative_samples_generator)
+            p_samples = next(positive_samples_generator)
+            
+            if p_samples != None:
+                word = p_samples[0]
+                context = p_samples[1]
+                for c in context:
+                    negative_samples = next(negative_samples_generator)
+                    positive_samples = [word, [context]]
+                    loss, p_loss, n_loss = get_loss(positive_samples, negative_samples, word_embedding, context_embedding, train_counts, total_count)
+                    word_grad, context_grad, neg_context_grad, neg_word_grad, word, context = get_grad(positive_samples, negative_samples, word_embedding, context_embedding)
+                    if anneal:
+                       if (epoch+1) %4 == 0:
+                           lr = 0.5*lr
+                    for w_grad in word_grad:
+                        word_embedding[word] = word_embedding[word] + lr*w_grad
+                    for key, w_grad in neg_word_grad.items():
+                        word_embedding[word] = word_embedding[word] + lr*(w_grad[0]*((train_counts[key]**(3/4))/total_count))
 
-            if positive_samples != None:
-                loss, p_loss, n_loss = get_loss(positive_samples, negative_samples, word_embedding, context_embedding, train_counts, total_count)
-                word_grad, context_grad, neg_context_grad, neg_word_grad, word, context = get_grad(positive_samples, negative_samples, word_embedding, context_embedding)
-                if anneal:
-                    if (epoch+1) %4 == 0:
-                        lr = 0.5*lr
-                for w_grad in word_grad:
-                    word_embedding[word] = word_embedding[word] + lr*w_grad
-                for key, w_grad in neg_word_grad.items():
-                    word_embedding[word] = word_embedding[word] + lr*(w_grad[0]*((train_counts[key]**(3/4))/total_count))
+                    for key, c_grad in context_grad.items():
+                        # print(c_grad[0].shape)
+                        context_embedding[key] = context_embedding[key] + lr*c_grad[0]
+                    for key, n_grad in neg_context_grad.items():
+                        context_embedding[key] = context_embedding[key] + lr*(n_grad[0]*((train_counts[key]**(3/4))/total_count))
+                    # running_loss.append(loss)
+                    # running_loss_n.append(n_loss)
+                    # running_loss_p.append(p_loss)
+                    if math.isnan(p_loss):
+                        print(neg_word_grad)
+                        exit()
+                    running_loss_n += n_loss
+                    running_loss_p += p_loss
+                    running_loss += loss
+                    count += 1
 
-                for key, c_grad in context_grad.items():
-                    # print(c_grad[0].shape)
-                    context_embedding[key] = context_embedding[key] + lr*c_grad[0]
-                for key, n_grad in neg_context_grad.items():
-                    context_embedding[key] = context_embedding[key] + lr*(n_grad[0]*((train_counts[key]**(3/4))/total_count))
-                # running_loss.append(loss)
-                # running_loss_n.append(n_loss)
-                running_loss_p.append(p_loss)
-                if math.isnan(p_loss):
-                    print(neg_word_grad)
-                    exit()
-                running_loss_n += n_loss
-                running_loss_p += p_loss
-                running_loss += loss
-                count += 1
-
-                loader.set_postfix(w_norm=np.linalg.norm(word_embedding[word]), p_loss=running_loss_p/count,
-                                    n_loss=running_loss_n/count, lr=lr)
+                    loader.set_postfix(w_norm=np.linalg.norm(word_embedding[word]), p_loss=running_loss_p/count,
+                                        n_loss=running_loss_n/count, lr=lr)
     pickle.dump(word_embedding, open('checkpoints/word_embeddings_15_100dim_v2.pkl', 'wb'))
     pickle.dump(context_embedding, open('checkpoints/context_embedding_15_100dim_v2.pkl', 'wb'))
 
