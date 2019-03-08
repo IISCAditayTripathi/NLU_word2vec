@@ -206,13 +206,9 @@ def get_loss(pos_samples, neg_samples, word_embedding, context_embedding, train_
     context = pos_samples[1]
 
     pos_loss_list = [math.log(sigmoid(np.dot(word_embedding[word], context_embedding[c]))) for c in context]
-    # print(pos_loss_list)
     neg_loss_list = [((train_counts[c]**(3/4))/total_count)*math.log(sigmoid(-1*np.dot(word_embedding[word], context_embedding[c]))) for c in neg_samples]
 
     loss = sum(pos_loss_list) + sum(neg_loss_list)
-    # print(pos_loss_list)
-    # print(neg_loss_list)
-    # print("Aditay")
     return loss, sum(pos_loss_list), sum(neg_loss_list)
 
 def get_grad(pos_samples, neg_samples, word_embedding, context_embedding):
@@ -261,7 +257,7 @@ def train_word2vec(tokenized_data_file, nb_neg_samples, lr, context, nb_epochs, 
         loader = tqdm(range(data_size), unit='words')
         for i in enumerate(loader):
             p_samples = next(positive_samples_generator)
-            
+
             if p_samples != None:
                 word = p_samples[0]
                 context = p_samples[1]
