@@ -281,7 +281,7 @@ def train_word2vec(tokenized_data_file, nb_neg_samples, lr, context, nb_epochs, 
                     context_embedding[key] = context_embedding[key] + lr*(n_grad[0]*((train_counts[key]**(3/4))/total_count))
                 # running_loss.append(loss)
                 # running_loss_n.append(n_loss)
-                # running_loss_p.append(p_loss)
+                running_loss_p.append(p_loss)
                 if math.isnan(p_loss):
                     print(neg_word_grad)
                     exit()
