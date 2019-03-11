@@ -25,19 +25,19 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--tokenize', type=bool, default=False)
 parser.add_argument('--build_dict', type=bool, default=False)
 parser.add_argument('--initilize', type=bool, default=False)
-parser.add_argument('--embedding_dim', type=int, default=100)
-parser.add_argument('--train_embeddings', type=bool, default=True)
+parser.add_argument('--embedding_dim', type=int, default=50)
+parser.add_argument('--train_embeddings', type=bool, default=False)
 parser.add_argument('--nb_negative_samples', type=int, default=10)
-parser.add_argument('--lr', type=float, default=0.1)
-parser.add_argument('--context', type=int, default=5)
-parser.add_argument('--lemmatize', type=bool, default=False)
+parser.add_argument('--lr', type=float, default=0.05)
+parser.add_argument('--context', type=int, default=7)
+parser.add_argument('--lemmatize', type=bool, default=True)
 parser.add_argument('--stemming', type=bool, default=False)
-parser.add_argument('--tokenized_data_file', type=str, default='tokenized_data_with_stopwords.pkl')
-parser.add_argument('--nb_epochs', type=int, default=15)
-parser.add_argument('--lr_annealing', type=bool, default=True)
+parser.add_argument('--tokenized_data_file', type=str, default='tokenized_data_lemmatized.pkl')
+parser.add_argument('--nb_epochs', type=int, default=14)
+parser.add_argument('--lr_annealing', type=bool, default=False)
 parser.add_argument('--simlex_file', type=str, default='/scratche/home/aditay/NLU_assignment1/simlex/SimLex-999/SimLex-999.txt')
-parser.add_argument('--pearson_cofficient', type=bool, default=False)
-parser.add_argument('--remove_stop_words', type=bool, default=False)
+parser.add_argument('--pearson_cofficient', type=bool, default=True)
+parser.add_argument('--remove_stop_words', type=bool, default=True)
 
 args = parser.parse_args()
 nltk.download('wordnet')
@@ -140,12 +140,12 @@ def build_dict(file_name):
     test_counts = Counter(test_tokens)
     word2counts = {}
     print(len(train_tokens))
-    pickle.dump(train_counts, open('dict_count_train.pkl', 'wb'))
-    pickle.dump(test_counts, open('dict_count_test.pkl', 'wb'))
+    pickle.dump(train_counts, open('dict_count_train_lemmatized.pkl', 'wb'))
+    pickle.dump(test_counts, open('dict_count_test_lemmatized.pkl', 'wb'))
 
 def initilize_word_embeddings(dim):
     print("Initilizing word2vec embeddings ++++++++")
-    train_counts = pickle.load(open('dict_count_train.pkl','rb'))
+    train_counts = pickle.load(open('dict_count_train_lemmatized.pkl','rb'))
     initial_embeddings = {}
     sigma = 1
 #    sigma = math.sqrt(2/dim)
@@ -241,7 +241,7 @@ def sgd_step(embedding, grad, lr):
 
 def train_word2vec(tokenized_data_file, nb_neg_samples, lr, context, nb_epochs, dim, anneal):
     # build_dict(tokenized_data_file)
-    train_counts = pickle.load(open('dict_count_train.pkl','rb'))
+    train_counts = pickle.load(open('dict_count_train_lemmatized.pkl','rb'))
     normalized_counts, total_count = normalize_counts(train_counts)
     threshold = 0.00001
     tokenized_data = pickle.load(open(tokenized_data_file,'rb'))
@@ -301,8 +301,8 @@ def train_word2vec(tokenized_data_file, nb_neg_samples, lr, context, nb_epochs, 
 
                     loader.set_postfix(w_norm=np.linalg.norm(word_embedding[word]), p_loss=running_loss_p/count,
                                         n_loss=running_loss_n/count, lr=lr)
-    pickle.dump(word_embedding, open('checkpoints/word_embeddings_10_100dim_vanila_with_stopwords_v5.1.1.pkl', 'wb'))
-    pickle.dump(context_embedding, open('checkpoints/context_embedding_10_100dim_vanila_with_stopwords_v5.1.1.pkl', 'wb'))
+    pickle.dump(word_embedding, open('checkpoints/word_embeddings_10_50dim_with_lemma_context_7_v5.1.2.pkl', 'wb'))
+    pickle.dump(context_embedding, open('checkpoints/context_embedding_10_50dim_with_lemma_context_7_v5.1.2.pkl', 'wb'))
 
                 # loss = get_loss(pos_samples, neg_samles)
                 # word_grad, context_grad, neg_context_grad, word, context = get_grad(positive_samples, negative_samples, word_embedding, context_embedding)
@@ -311,8 +311,8 @@ def calculate_cosine_similarity(vector_1, vector_2):
     print(similarity)
     return similarity
 
-def calculate_pearson_cofficient(simlex_file, word_embedding='checkpoints/word_embeddings_10_100dim_vanila_with_stopwords_v5.1.pkl',
-                                context_embedding='checkpoints/context_embedding_10_100dim_vanila_with_stopwords_v5.1.pkl'):
+def calculate_pearson_cofficient(simlex_file, word_embedding='checkpoints/word_embeddings_10_50dim_with_lemma_context_7_v5.1.2.pkl',
+                                context_embedding='checkpoints/context_embedding_10_50dim_with_lemma_context_7_v5.1.2.pkl'):
     sim_file = open(simlex_file, 'r')
     w_embedding = pickle.load(open(word_embedding, 'rb'))
     c_embedding = pickle.load(open(context_embedding, 'rb'))
