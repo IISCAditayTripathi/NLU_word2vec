@@ -18,7 +18,8 @@ from tqdm import tqdm
 import math
 from collections import defaultdict
 from scipy.stats.stats import pearsonr
-# import sklearn
+import operator
+
 nltk.download('reuters')
 parser = argparse.ArgumentParser()
 
@@ -36,8 +37,11 @@ parser.add_argument('--tokenized_data_file', type=str, default='tokenized_data_l
 parser.add_argument('--nb_epochs', type=int, default=14)
 parser.add_argument('--lr_annealing', type=bool, default=False)
 parser.add_argument('--simlex_file', type=str, default='/scratche/home/aditay/NLU_assignment1/simlex/SimLex-999/SimLex-999.txt')
-parser.add_argument('--pearson_cofficient', type=bool, default=True)
+parser.add_argument('--pearson_cofficient', type=bool, default=False)
 parser.add_argument('--remove_stop_words', type=bool, default=True)
+parser.add_argument('--k_NN', type=str, default='would')
+parser.add_argument('--k', type=int, default=10)
+parser.add_argument('--syntactic_analogy', type=bool, default=True)
 
 args = parser.parse_args()
 nltk.download('wordnet')
@@ -308,11 +312,10 @@ def train_word2vec(tokenized_data_file, nb_neg_samples, lr, context, nb_epochs, 
                 # word_grad, context_grad, neg_context_grad, word, context = get_grad(positive_samples, negative_samples, word_embedding, context_embedding)
 def calculate_cosine_similarity(vector_1, vector_2):
     similarity = np.dot(vector_1, vector_2)/(np.linalg.norm(vector_1)*np.linalg.norm(vector_2))
-    print(similarity)
     return similarity
 
-def calculate_pearson_cofficient(simlex_file, word_embedding='checkpoints/word_embeddings_10_50dim_with_lemma_context_7_v5.1.2.pkl',
-                                context_embedding='checkpoints/context_embedding_10_50dim_with_lemma_context_7_v5.1.2.pkl'):
+def calculate_pearson_cofficient(simlex_file, word_embedding='checkpoints/word_embeddings_10_50dim_with_lemma_v5.1.2.pkl',
+                                context_embedding='checkpoints/context_embedding_10_50dim_with_lemma_v5.1.2.pkl'):
     sim_file = open(simlex_file, 'r')
     w_embedding = pickle.load(open(word_embedding, 'rb'))
     c_embedding = pickle.load(open(context_embedding, 'rb'))
@@ -360,6 +363,48 @@ def calculate_pearson_cofficient(simlex_file, word_embedding='checkpoints/word_e
     pearson_cofficient = pearsonr(simlex_scores, model_scores)
     print(pearson_cofficient)
 
+def get_k_NN(test_word, word_embedding='checkpoints/word_embeddings_10_50dim_with_lemma_v5.1.2.pkl',
+                                context_embedding='checkpoints/context_embedding_10_50dim_with_lemma_v5.1.2.pkl', k=10):
+    word_embedding = pickle.load(open(word_embedding, 'rb'))
+    context_embedding = pickle.load(open(context_embedding, 'rb'))
+
+    if args.lemmatize:
+        test_word = lemmer.lemmatize(test_word)
+
+    score_dict = defaultdict(float)
+    for key, embed in word_embedding.items():
+        try:
+            t_w = word_embedding[test_word]
+            t_c = context_embedding[test_word]
+            t = np.hstack([t_w, t_c])
+        except:
+            print("Word not present in the dictionary. Try a different word.")
+        w_w = embed
+        w_c = context_embedding[key]
+        w = np.hstack([w_w, w_c])
+
+        similarity = calculate_cosine_similarity(t, w)
+        score_dict[key] = (similarity)
+    sorted_score_dict = sorted(score_dict.items(), key=operator.itemgetter(1))
+    print(sorted_score_dict[-k:])
+
+def syntactic_analogy():
+    word_embedding='checkpoints/word_embeddings_10_50dim_vanilla_with_stopwords_v5.1.2.pkl'
+    context_embedding='checkpoints/context_embedding_10_50dim_vanila_with_stopwords_v5.1.2.pkl'
+    word1 = "quick"
+    word2 = "quickly"
+    word3 = "slow"
+
+    word4 = np.hstack([word_embedding[word1], context_embedding[word1]]) - np.hstack([word_embedding[word2], context_embedding[word2]]) + np.hstack([word_embedding[word3], context_embedding[word3]])
+    score_dict = defaultdict(float)
+    for key, embed in word_embedding.items():
+        w_w = embed
+        w_c = context_embedding[key]
+        w = np.hstack([w_w, w_c])
+        similarity = calculate_cosine_similarity(word4, w)
+        score_dict[key] = (similarity)
+    sorted_score_dict = sorted(score_dict.items(), key=operator.itemgetter(1))
+    print(sorted_score_dict[-k:])
 
 
 
@@ -379,3 +424,9 @@ if args.train_embeddings:
 
 if args.pearson_cofficient:
     calculate_pearson_cofficient(args.simlex_file)
+
+if args.k_NN:
+    get_k_NN(args.k_NN, k=args.k)
+
+if args.syntactic_analogy:
+    syntactic_analogy()
