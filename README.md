@@ -1,6 +1,7 @@
 # Word2Vec implementation on Reuters corpus
 
-Word2vec is implemented in python3 and numpy. Gradient calculation and gradient ascent is written in python. It has following dependencies:
+Word2vec is implemented in python3 and numpy. Gradient calculation and gradient ascent is written in python itself. It has following dependencies:
+- python3
 - numpy
 - nltk
 - pickle
