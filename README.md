@@ -1,4 +1,13 @@
 # Word2Vec implementation on Reuters corpus
+
+Word2vec is implemented in python3 and numpy. Gradient calculation and gradient ascent is written in python. It has following dependencies:
+- numpy
+- nltk
+- pickle
+- tqdm
+- scipy
+- operator
+
 ## Data Preprocessing
 The Reuters dataset has *7k* documents. All these documents are combined together
 to make a single document. The words in the document are lower cased. To perform **data
