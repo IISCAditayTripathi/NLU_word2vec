@@ -389,13 +389,26 @@ def get_k_NN(test_word, word_embedding='checkpoints/word_embeddings_10_50dim_wit
     print(sorted_score_dict[-k:])
 
 def syntactic_analogy():
-    word_embedding='checkpoints/word_embeddings_10_50dim_vanilla_with_stopwords_v5.1.2.pkl'
-    context_embedding='checkpoints/context_embedding_10_50dim_vanila_with_stopwords_v5.1.2.pkl'
-    word1 = "quick"
-    word2 = "quickly"
-    word3 = "slow"
+    if args.lemmatize:
+        word_embedding = 'checkpoints/word_embeddings_10_50dim_with_lemma_v5.1.2.pkl'
+        context_embedding = 'checkpoints/context_embedding_10_50dim_with_lemma_v5.1.2.pkl'
+    else:
+        word_embedding='checkpoints/word_embeddings_10_50dim_vanila_with_stopwords_v5.1.1.pkl'
+        context_embedding='checkpoints/context_embedding_10_50dim_vanila_with_stopwords_v5.1.1.pkl'
+    word_embedding = pickle.load(open(word_embedding, 'rb'))
+    context_embedding = pickle.load(open(context_embedding, 'rb'))
 
-    word4 = np.hstack([word_embedding[word1], context_embedding[word1]]) - np.hstack([word_embedding[word2], context_embedding[word2]]) + np.hstack([word_embedding[word3], context_embedding[word3]])
+    word1 = 'quick'
+    word2 = 'quickly'
+    word3 = 'slow'
+    if args.lemmatize:
+        word1 = lemmer.lemmatize(word1)
+        word2 = lemmer.lemmatize(word2)
+        word3 = lemmer.lemmatize(word3)
+    word1 = np.hstack([word_embedding[word1], context_embedding[word1]])
+    word2 = np.hstack([word_embedding[word2], context_embedding[word2]])
+    word3 = np.hstack([word_embedding[word3], context_embedding[word3]])
+    word4 = word1 - word2 + word3
     score_dict = defaultdict(float)
     for key, embed in word_embedding.items():
         w_w = embed
@@ -404,6 +417,7 @@ def syntactic_analogy():
         similarity = calculate_cosine_similarity(word4, w)
         score_dict[key] = (similarity)
     sorted_score_dict = sorted(score_dict.items(), key=operator.itemgetter(1))
+    k = 10
     print(sorted_score_dict[-k:])
 
 
