@@ -30,18 +30,20 @@ parser.add_argument('--embedding_dim', type=int, default=50)
 parser.add_argument('--train_embeddings', type=bool, default=False)
 parser.add_argument('--nb_negative_samples', type=int, default=10)
 parser.add_argument('--lr', type=float, default=0.05)
-parser.add_argument('--context', type=int, default=7)
-parser.add_argument('--lemmatize', type=bool, default=True)
+parser.add_argument('--context', type=int, default=5)
+parser.add_argument('--lemmatize', type=bool, default=False)
 parser.add_argument('--stemming', type=bool, default=False)
 parser.add_argument('--tokenized_data_file', type=str, default='tokenized_data_lemmatized.pkl')
 parser.add_argument('--nb_epochs', type=int, default=14)
 parser.add_argument('--lr_annealing', type=bool, default=False)
 parser.add_argument('--simlex_file', type=str, default='/scratche/home/aditay/NLU_assignment1/simlex/SimLex-999/SimLex-999.txt')
 parser.add_argument('--pearson_cofficient', type=bool, default=False)
-parser.add_argument('--remove_stop_words', type=bool, default=True)
-parser.add_argument('--k_NN', type=str, default='king')
+parser.add_argument('--remove_stop_words', type=bool, default=False)
+parser.add_argument('--k_NN', type=str, default='queen')
 parser.add_argument('--k', type=int, default=10)
 parser.add_argument('--syntactic_analogy', type=bool, default=False)
+parser.add_argument('--word_model', type=str, default='checkpoints/word_embeddings_10_50dim_with_lemma_v5.1.2.pkl')
+parser.add_argument('--context_model', type=str, default='checkpoints/context_embedding_10_50dim_with_lemma_v5.1.2.pkl')
 
 args = parser.parse_args()
 nltk.download('wordnet')
@@ -146,8 +148,12 @@ def build_dict(file_name):
 
 def initilize_word_embeddings(dim):
     print("Initilizing word2vec embeddings ++++++++")
-    train_counts = pickle.load(open('dict_count_train_lemmatized.pkl','rb'))
-    initial_embeddings = {}
+    if args.lemmatize:
+    # token_file = args.tokenized_data_file
+        train_counts = pickle.load(open('dict_count_train_lemmatized.pkl','rb'))
+    else:
+        train_counts = pickle.load(open('dict_count_train.pkl','rb'))
+    # initial_embeddings = {}
     sigma = 1
 #    sigma = math.sqrt(2/dim)
 
@@ -238,8 +244,11 @@ def sgd_step(embedding, grad, lr):
     pass
 
 def train_word2vec(tokenized_data_file, nb_neg_samples, lr, context, nb_epochs, dim, anneal):
+    if args.lemmatize:
+        train_counts = pickle.load(open('dict_count_train_lemmatized.pkl','rb'))
+    else:
+        train_counts = pickle.load(open('dict_count_train.pkl','rb'))
 
-    train_counts = pickle.load(open('dict_count_train_lemmatized.pkl','rb'))
     normalized_counts, total_count = normalize_counts(train_counts)
     threshold = 0.00001
     tokenized_data = pickle.load(open(tokenized_data_file,'rb'))
@@ -437,7 +446,7 @@ if args.train_embeddings:
     args.context, args.nb_epochs, args.embedding_dim, args.lr_annealing)
 
 if args.pearson_cofficient:
-    calculate_pearson_cofficient(args.simlex_file)
+    calculate_pearson_cofficient(args.simlex_file,word_embedding=args.word_model,context_embedding=args.context_model)
 
 if args.k_NN:
     get_k_NN(args.k_NN, k=args.k)
