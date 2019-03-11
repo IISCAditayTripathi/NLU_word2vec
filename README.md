@@ -9,6 +9,10 @@ Word2vec is implemented in python3 and numpy. Gradient calculation and gradient 
 - scipy
 - operator
 
+To **Install** Depedencies run the following command:
+```
+pip3 install -r requirement.txt
+```
 ## Data Preprocessing
 The Reuters dataset has *7k* documents. All these documents are combined together
 to make a single document. The words in the document are lower cased. To perform **data
