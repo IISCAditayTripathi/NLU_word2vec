@@ -39,21 +39,18 @@ parser.add_argument('--lr_annealing', type=bool, default=False)
 parser.add_argument('--simlex_file', type=str, default='/scratche/home/aditay/NLU_assignment1/simlex/SimLex-999/SimLex-999.txt')
 parser.add_argument('--pearson_cofficient', type=bool, default=False)
 parser.add_argument('--remove_stop_words', type=bool, default=True)
-parser.add_argument('--k_NN', type=str, default='would')
+parser.add_argument('--k_NN', type=str, default='king')
 parser.add_argument('--k', type=int, default=10)
-parser.add_argument('--syntactic_analogy', type=bool, default=True)
+parser.add_argument('--syntactic_analogy', type=bool, default=False)
 
 args = parser.parse_args()
 nltk.download('wordnet')
-# print(">>> The reuters corpus has {} tags".format(len(reuters.categories())))
-# print(">>> The reuters corpus has {} documents".format(len(reuters.fileids())))
+print("The reuters corpus has {} tags".format(len(reuters.categories())))
+print("The reuters corpus has {} documents".format(len(reuters.fileids())))
+
 lemmer = WordNetLemmatizer()
 
 def sigmoid(x):
-    # print(x)
-    # if x < -10:
-    #     x = -10
-    # print(x)
     return 1 / (1 + math.exp(-x))
 
 def get_train_test_splits():
@@ -215,7 +212,6 @@ def neg_generator(nb_neg_samples, len_dic ,dic_list):
 def get_loss(pos_samples, neg_samples, word_embedding, context_embedding, train_counts, total_count):
     word = pos_samples[0]
     context = pos_samples[1]
-#    print(context)
     pos_loss_list = [math.log(sigmoid(np.dot(word_embedding[word], context_embedding[c]))) for c in context]
     neg_loss_list = [((train_counts[c]**(3/4))/total_count)*math.log(sigmoid(-1*np.dot(word_embedding[word], context_embedding[c]))) for c in neg_samples]
 
@@ -227,16 +223,14 @@ def get_grad(pos_samples, neg_samples, word_embedding, context_embedding):
     context = pos_samples[1]
 
     word_grad = [(1-sigmoid(np.dot(word_embedding[word], context_embedding[c])))*context_embedding[c] for c in context]
-    # print(np.linalg.norm(word_embedding[word]))
-    # print(np.linalg.norm(word_grad[0]))
+
     context_grad = defaultdict(list)
     [context_grad[c].append((1-sigmoid(np.dot(word_embedding[word], context_embedding[c])))*word_embedding[word]) for c in context]
     neg_context_grad = defaultdict(list)
     [neg_context_grad[c].append(-1*(1-sigmoid(np.dot(-word_embedding[word], context_embedding[c])))*word_embedding[word]) for c in neg_samples]
     neg_word_grad = defaultdict(list)
     [neg_word_grad[c].append(-1*(1-sigmoid(np.dot(-word_embedding[word], context_embedding[c])))*context_embedding[c]) for c in neg_samples]
-    # print(word_grad)
-    # aditay
+
 
     return word_grad, context_grad, neg_context_grad, neg_word_grad, word, context
 
@@ -244,7 +238,7 @@ def sgd_step(embedding, grad, lr):
     pass
 
 def train_word2vec(tokenized_data_file, nb_neg_samples, lr, context, nb_epochs, dim, anneal):
-    # build_dict(tokenized_data_file)
+
     train_counts = pickle.load(open('dict_count_train_lemmatized.pkl','rb'))
     normalized_counts, total_count = normalize_counts(train_counts)
     threshold = 0.00001
@@ -275,7 +269,7 @@ def train_word2vec(tokenized_data_file, nb_neg_samples, lr, context, nb_epochs, 
                 for c in context:
                     negative_samples = next(negative_samples_generator)
                     positive_samples = [word, [c]]
-#                    print(negative_samples)
+
                     loss, p_loss, n_loss = get_loss(positive_samples, negative_samples, word_embedding, context_embedding, train_counts, total_count)
                     word_grad, context_grad, neg_context_grad, neg_word_grad, word, context = get_grad(positive_samples, negative_samples, word_embedding, context_embedding)
                     if anneal:
@@ -292,9 +286,7 @@ def train_word2vec(tokenized_data_file, nb_neg_samples, lr, context, nb_epochs, 
                     for key, n_grad in neg_context_grad.items():
                         context_embedding[key] = context_embedding[key] + lr*n_grad[0]
                         # context_embedding[key] = context_embedding[key] + lr*(n_grad[0]*((train_counts[key]**(3/4))/total_count))
-                    # running_loss.append(loss)
-                    # running_loss_n.append(n_loss)
-                    # running_loss_p.append(p_loss)
+
                     if math.isnan(p_loss):
                         print(neg_word_grad)
                         exit()
@@ -329,7 +321,7 @@ def calculate_pearson_cofficient(simlex_file, word_embedding='checkpoints/word_e
             # print(l)
 
             try:
-                print(l)
+                # print(l)
                 if args.lemmatize:
                     w1_1 = w_embedding[lemmer.lemmatize(l[0])]
                     w1_2 = c_embedding[lemmer.lemmatize(l[0])]
@@ -343,7 +335,6 @@ def calculate_pearson_cofficient(simlex_file, word_embedding='checkpoints/word_e
                     simlex_scores.append(float(l[3]))
                     # print(w2v_score)
                     model_scores.append(w2v_score)
-                    # print(1)
                 else:
                     w1_1 = w_embedding[l[0]]
                     w1_2 = c_embedding[l[0]]
@@ -363,8 +354,15 @@ def calculate_pearson_cofficient(simlex_file, word_embedding='checkpoints/word_e
     pearson_cofficient = pearsonr(simlex_scores, model_scores)
     print(pearson_cofficient)
 
-def get_k_NN(test_word, word_embedding='checkpoints/word_embeddings_10_50dim_with_lemma_v5.1.2.pkl',
-                                context_embedding='checkpoints/context_embedding_10_50dim_with_lemma_v5.1.2.pkl', k=10):
+def get_k_NN(test_word, k=10):
+    if args.lemmatize:
+        word_embedding='checkpoints/word_embeddings_10_50dim_with_lemma_v5.1.2.pkl'
+        context_embedding='checkpoints/context_embedding_10_50dim_with_lemma_v5.1.2.pkl'
+    else:
+        word_embedding='checkpoints/word_embeddings_10_50dim_vanila_with_stopwords_v5.1.1.pkl'
+        context_embedding='checkpoints/context_embedding_10_50dim_vanila_with_stopwords_v5.1.1.pkl'
+
+
     word_embedding = pickle.load(open(word_embedding, 'rb'))
     context_embedding = pickle.load(open(context_embedding, 'rb'))
 
@@ -379,6 +377,7 @@ def get_k_NN(test_word, word_embedding='checkpoints/word_embeddings_10_50dim_wit
             t = np.hstack([t_w, t_c])
         except:
             print("Word not present in the dictionary. Try a different word.")
+            exit()
         w_w = embed
         w_c = context_embedding[key]
         w = np.hstack([w_w, w_c])
@@ -386,6 +385,7 @@ def get_k_NN(test_word, word_embedding='checkpoints/word_embeddings_10_50dim_wit
         similarity = calculate_cosine_similarity(t, w)
         score_dict[key] = (similarity)
     sorted_score_dict = sorted(score_dict.items(), key=operator.itemgetter(1))
+    print("Test word is: %s"%(test_word))
     print(sorted_score_dict[-k:])
 
 def syntactic_analogy():
